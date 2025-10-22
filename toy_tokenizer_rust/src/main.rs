@@ -97,11 +97,13 @@ fn decode(id_to_token: &IdToToken, encoded_sentence: &Vec<usize>) -> String {
 
 fn main() {
     let corpus = "The batat and the cat fought over the hat.";
+    println!("corpus: {}\n", corpus);
 
     let mut words: Words = vec![];
     for word in corpus.split(' ') {
         words.push(word.chars().map(|c| c.to_string()).collect());
     }
+    println!("initial words: {:?}\n", words);
 
     let mut tokens: HashSet<String> = HashSet::new();
     for word in &words {
@@ -109,6 +111,8 @@ fn main() {
             tokens.insert(c.to_string());
         }
     }
+    println!("initial tokens: {:?}\n", tokens);
+
 
     while tokens.len() < N_TOKENS {
         let pairs = generate_pairs(&words);
@@ -126,13 +130,11 @@ fn main() {
         .enumerate()
         .map(|(i, token)| (token.to_string(), i))
         .collect();
+    println!("token_to_id: {:?}\n", token_to_id);
 
     let id_to_token: IdToToken = token_to_id.iter()
         .map(|(token, id)| (*id, token.clone()))
         .collect();
-
-    println!("token_to_id: {:?}\n", token_to_id);
-
     let mut sorted_id_to_token: Vec<_> = id_to_token.iter().collect();
     sorted_id_to_token.sort_by_key(|(id, _)| *id);
     println!("id_to_token: {:?}\n", sorted_id_to_token);
