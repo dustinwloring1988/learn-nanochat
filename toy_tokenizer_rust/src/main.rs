@@ -17,12 +17,10 @@ impl Pair {
 
 fn generate_pairs(words: &Words) -> HashMap<Pair, u32> {
     let mut pairs: HashMap<Pair, u32> = HashMap::new();
-    
     for word in words {
-        for i in 0..word.len()-1 {
-            let pair = Pair{first: word[i].to_string(), second: word[i+1].to_string()};
-            let count = pairs.entry(pair).or_insert(0);
-            *count += 1;
+        for window in word.windows(2) {
+            let pair = Pair{first: window[0].to_string(), second: window[1].to_string()};
+            *pairs.entry(pair).or_insert(0) += 1;
         }
     }
     pairs
