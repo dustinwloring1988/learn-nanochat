@@ -1,6 +1,7 @@
 use std::time::Instant;
 use rayon::prelude::*;
 use std::collections::HashMap;
+use dashmap::DashMap;
 
 fn add_numbers() {
     let numbers: Vec<u64> = (1..1_000_000_000).collect();
@@ -75,6 +76,19 @@ fn count_words() {
         );
     println!("counts: {:?}", counts);
     println!("time elapsed: {:?}\n", start.elapsed());
+
+    // using DashMap, a lock-free concurrent HashMap
+    println!("--counting {} words with parallel and DashMap--", words.len());
+    let start = Instant::now();
+    let counts: DashMap<String, u32> = DashMap::new();
+    words.par_iter().for_each(|word| *counts.entry(word.to_string()).or_insert(0) += 1);
+    println!("counts: {:?}", counts);
+    println!("time elapsed: {:?}\n", start.elapsed());
+
+    // interesting watching my mac CPU with top I see it pegged around 100% for first two, approaching
+    // 800% for third, and around 225% for fourth
+    // sysctl hw.ncpu
+    // hw.ncpu: 8
 }
 
 fn main() {
