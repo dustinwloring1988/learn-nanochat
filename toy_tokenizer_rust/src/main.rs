@@ -4,6 +4,8 @@ use std::collections::HashSet;
 use std::collections::HashMap;
 
 type Words = Vec<Vec<String>>; // e.g. [["T", "h", "e"], ["c", "a", "t"]] or [["Th", "e"], ["c", "at"]]
+type TokenToId = HashMap<String, usize>;
+type IdToToken = HashMap<usize, String>;
 
 #[derive(PartialEq, Eq, Hash, Debug)]
 struct Pair {
@@ -59,7 +61,7 @@ fn update_words_with_new_token(words: &mut Words, new_pair: &Pair) {
 
 const N_TOKENS: usize = 20;
 
-fn encode_word(token_to_id: &HashMap<&String, usize>, word: &str) -> Vec<usize> {
+fn encode_word(token_to_id: &TokenToId, word: &str) -> Vec<usize> {
     let mut encoded: Vec<usize> = vec![];
     let mut unencoded_part: String = word.to_string();
     while unencoded_part.chars().count() > 0 {
@@ -71,7 +73,7 @@ fn encode_word(token_to_id: &HashMap<&String, usize>, word: &str) -> Vec<usize> 
             i -= 1;
         }
         if token_id.is_none() {
-            token_id = token_to_id.get(&"<unk>".to_string()).copied();
+            token_id = token_to_id.get("<unk>").copied();
         }
         encoded.push(token_id.unwrap());
         unencoded_part = unencoded_part.chars().skip(i+1).collect();
@@ -79,17 +81,17 @@ fn encode_word(token_to_id: &HashMap<&String, usize>, word: &str) -> Vec<usize> 
     encoded
 }
 
-fn encode(token_to_id: &HashMap<&String, usize>, sentence: &str) -> Vec<usize> {
+fn encode(token_to_id: &TokenToId, sentence: &str) -> Vec<usize> {
     let mut encoded: Vec<usize> = vec![];
     for word in sentence.split(' ') {
         encoded.extend(encode_word(token_to_id, word));
-        encoded.push(token_to_id[&" ".to_string()]);
+        encoded.push(token_to_id[" "]);
     }
     encoded.pop();
     encoded
 }
 
-fn decode(id_to_token: &HashMap<usize, &String>, encoded_sentence: &Vec<usize>) -> String {
+fn decode(id_to_token: &IdToToken, encoded_sentence: &Vec<usize>) -> String {
     encoded_sentence.iter().map(|id| id_to_token[id].as_str()).collect()
 }
 
@@ -120,13 +122,13 @@ fn main() {
     println!("words: {:?}\n", words);
     println!("tokens: {:?}\n", tokens);
 
-    let token_to_id: HashMap<&String, usize> = tokens.iter() // should this be String not &String ?
+    let token_to_id: TokenToId = tokens.iter()
         .enumerate()
-        .map(|(i, token)| (token, i))
+        .map(|(i, token)| (token.to_string(), i))
         .collect();
 
-    let id_to_token: HashMap<usize, &String> = token_to_id.iter()
-        .map(|(token, id)| (*id, *token))
+    let id_to_token: IdToToken = token_to_id.iter()
+        .map(|(token, id)| (*id, token.clone()))
         .collect();
 
     println!("token_to_id: {:?}\n", token_to_id);
