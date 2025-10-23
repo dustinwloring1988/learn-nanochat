@@ -31,10 +31,11 @@ cargo run
 
 Got this working and then made the code into what is hopefully more idiomatic Rust.
 
+
 #### Challlenge 4
 Write something that does something in parallel, example using map / reduce.
 
-## Next challenges
-
-#### Challenge
+#### Challenge 5
 Call Rust code from Python.
+
+See note at top of `call-rust-functions.ipynb` for how to build. (Don't use `cargo build`.)
