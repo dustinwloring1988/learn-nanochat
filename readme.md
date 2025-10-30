@@ -66,6 +66,9 @@ Create the model skeleton in a notebook and go through each step of the forward 
 #### Challenge 11
 Understand the weight initialization code and copy it to `my_gpt.py`. Goal is to be able to pretrain the model soon.
 
+#### Challenge 12
+Understand the setup optimizers code and copy it to `my_gpt.py`. Still moving toward having enough in place to pretrain the model.
+
 #### Future potential challenges and/or things to look up
 * Evaluate the tokenizer similar to `scripts/tok_eval.py`.
 
@@ -76,3 +79,7 @@ Understand the weight initialization code and copy it to `my_gpt.py`. Goal is to
 * Why is bias=False for the linear transforms in GPT?
 
 * Why is the type of cos / sin bfloat16?
+
+* Make sure I understand why we init many layers to zero
+
+* Replace my wholesale copy of muon.py with one I hand copied and understand

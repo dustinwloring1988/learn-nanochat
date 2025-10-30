@@ -5,6 +5,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import math
+from functools import partial
+from my_nanochat.my_common import get_dist_info
+from my_nanochat.muon import Muon, DistMuon
 
 @dataclass
 class GPTConfig:
@@ -146,6 +149,43 @@ class GPT(nn.Module):
         self.cos, self.sin = cos, sin
         if self.transformer.wte.weight.device.type == "cuda":
             self.transformer.wte.to(dtype=torch.bfloat16)
+
+    def setup_optimizers(self, unembedding_lr=0.004, embedding_lr=0.2, matrix_lr=0.2, weight_decay=0.0):
+        model_dim = self.config.n_embd
+        ddp, rank, local_rank, world_size = get_dist_info()
+        # seperate params into 3 groups
+        matrix_params = list(self.transformer.h.parameters())
+        embedding_params = list(self.transformer.wte.parameters())
+        lm_head_params = list(self.lm_head.parameters())
+        assert len(list(self.parameters())) == len(matrix_params) + len(embedding_params) + len(lm_head_params)
+
+        # create the AdamW optimizer for the embedding and lm_head
+        # see notes in his code and notebook
+        dmodel_lr_scale = (model_dim / 768) ** -0.5; dmodel_lr_scale
+        if rank == 0:
+            print(f"Scaling the LR for the AdamW parameters proportional to 1/sqrt({model_dim}/768) = {dmodel_lr_scale}")
+        adam_groups = [
+            dict(params=lm_head_params, lr=unembedding_lr * dmodel_lr_scale),
+            dict(params=embedding_params, lr=embedding_lr * dmodel_lr_scale),
+        ]
+        adamw_kwargs = dict(betas=(0.8, 0.95), eps=1e-10, weight_decay=weight_decay)
+        DistAdamW = None # for now so it will fail until I "copy" adamw.py
+        AdamWFactory = DistAdamW if ddp else partial(torch.optim.AdamW, fused=True)
+        adamw_optimizer = AdamWFactory(adam_groups, **adamw_kwargs)
+        
+        # Create the Muon optimizer for the linear layers
+        muon_kwargs = dict(lr=matrix_lr, momentum=0.95)
+        MuonFactory = DistMoon if ddp else Muon
+        muon_optimizer = MuonFactory(matrix_params, **muon_kwargs)
+
+        # combine the two optimizers into one list
+        optimizers = [adamw_optimizer, muon_optimizer]
+        for opt in optimizers:
+            for group in opt.param_groups:
+                group["initial_lr"] = group["lr"] # guessing for reporting
+
+        return optimizers
+
 
     def forward(self, idx, targets=None, kv_cache=None, loss_reduction='mean'):
         assert kv_cache is None # for now
