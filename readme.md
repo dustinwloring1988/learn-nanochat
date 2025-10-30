@@ -63,6 +63,9 @@ Why? There is no way I can just start "copying" all the pre-training and model c
 #### Challenge 10
 Create the model skeleton in a notebook and go through each step of the forward pass. Do this with tiny dimensions and a tiny x and y so I can see and follow the intermediate tensors.
 
+#### Challenge 11
+Understand the weight initialization code and copy it to `my_gpt.py`. Goal is to be able to pretrain the model soon.
+
 #### Future potential challenges and/or things to look up
 * Evaluate the tokenizer similar to `scripts/tok_eval.py`.
 
