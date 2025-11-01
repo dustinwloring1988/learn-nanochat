@@ -72,6 +72,9 @@ Understand the setup optimizers code and copy it to `my_gpt.py`. Still moving to
 #### Challenge 13
 Leaving out nearly as much as possible from `base_train.py`, try to train a depth 4 (?) model on my macbook.
 
+#### Challenge 14
+Train the baby model from challenge 13 on a single GPU. The point of this is to get an environment set up to work with a GPU and to make sure device is set/used properly in the code so far. I'll still need to add in validation, metrics, and checkpointing before scaling up.
+
 #### Future potential challenges and/or things to look up
 * Evaluate the tokenizer similar to `scripts/tok_eval.py`.
 
@@ -90,3 +93,5 @@ Leaving out nearly as much as possible from `base_train.py`, try to train a dept
 * Understand meta init
 
 * With AdamW, for example, why do we still modify the LR in the training loop?
+
+* How do positional embeddings really work? Why do they work? What if you leave them out? What if you put them only before the first layer?

@@ -115,9 +115,11 @@ class GPT(nn.Module):
         self.register_buffer("sin", sin, persistent=False)
 
     def _precompute_rotary_embeddings(self, seq_len, head_dim, base=10_000, device=None):
-        channel_range = torch.arange(0, head_dim, 2, dtype=torch.float32)
+        if device is None:
+            device = self.get_device()
+        channel_range = torch.arange(0, head_dim, 2, dtype=torch.float32, device=device)
         inv_freq = 1.0 / (base ** (channel_range / head_dim))
-        t = torch.arange(seq_len, dtype=torch.float32)
+        t = torch.arange(seq_len, dtype=torch.float32, device=device)
         freqs = torch.outer(t, inv_freq)
         cos, sin = freqs.cos(), freqs.sin()
         cos, sin = cos.bfloat16(), sin.bfloat16()
@@ -135,6 +137,9 @@ class GPT(nn.Module):
                 torch.nn.init_zeroes_(module.bias)
         elif isinstance(module, nn.Embedding):
             torch.nn.init.normal_(module.weight, mean=0.0, std=1.0)
+
+    def get_device(self):
+        return self.transformer.wte.weight.device
 
     def init_weights(self):
         self.apply(self._init_weights)

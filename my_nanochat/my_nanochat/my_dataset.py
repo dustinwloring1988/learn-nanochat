@@ -4,8 +4,11 @@ import requests
 import os
 import pyarrow.parquet as pq
 from my_nanochat.my_common import get_base_dir
+from multiprocessing import Pool
+import argparse
 
 BASE_URL = "https://huggingface.co/datasets/karpathy/fineweb-edu-100b-shuffle/resolve/main"
+MAX_SHARD = 1822
 index_to_filename = lambda index: f"shard_{index:05d}.parquet" # format of the filenames
 
 def download_single_file(index):
@@ -13,18 +16,23 @@ def download_single_file(index):
     url = f"{BASE_URL}/{filename}"
     print(f"downloading {filename}...")
 
+    final_path = os.path.join(get_base_dir(), filename)
+    if os.path.exists(final_path):
+        print(f"{filename} already downloaded")
+        return True
+
     max_attempts = 5
     for attempt in range(1, max_attempts+1):
         try:
             response = requests.get(url, stream = True, timeout = 30)
             response.raise_for_status()
-            temp_path = f"{filename}.tmp"
+            temp_path = os.path.join(get_base_dir(), f"{filename}.tmp")
             with open(temp_path, 'wb') as f:
                 for chunk in response.iter_content(chunk_size = 1024 * 1024):
                     if chunk:
                         f.write(chunk)
-            os.rename(temp_path, filename)
-            print(f"downloaded {filename}")
+            os.rename(temp_path, final_path)
+            print(f"downloaded {final_path}")
             return True
 
         except (requests.RequestException, IOError) as e:
@@ -85,3 +93,18 @@ def text_iterator(max_chars=10_000_000_000, doc_cap=10_000):
             if (total_chars >= max_chars):
                 return
 
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Download FineWeb-Edu 100BT dataset shards")
+    parser.add_argument("-n", "--num-files", type=int, default=-1, help="Number of shards to download (default: -1), -1 = all")
+    parser.add_argument("-w", "--num-workers", type=int, default=4, help="Number of parallel download workers (default: 4)")
+    args = parser.parse_args()
+
+    num = MAX_SHARD + 1 if args.num_files == -1 else min(args.num_files, MAX_SHARD + 1)
+    ids_to_download = list(range(num))
+    print(f"Downloading {len(ids_to_download)} shards using {args.num_workers} workers")
+
+    with Pool(processes=args.num_workers) as pool:
+        results = pool.map(download_single_file, ids_to_download)
+
+    successes = sum(1 for success in results if success)
+    print(f"done! download {successes} of {len(ids_to_download)}")
