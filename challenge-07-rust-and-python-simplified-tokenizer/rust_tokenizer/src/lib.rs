@@ -304,6 +304,9 @@ impl Tokenizer {
             }
 
             merges_done += 1;
+            if merges_done % 1000 == 0 {
+                println!("Merges done: {}", merges_done);
+            }
 
             if self.debug_print {
                 println!("----- end of merge in of pair {:?} with id {} ------", top.pair, new_id);
@@ -389,8 +392,11 @@ impl Tokenizer {
             println!("----start of iterating through text passed in, splitting it into words, and counting----\n");
         }
 
+        let mut buffers_filled = 0; // only for showing status
         loop {
             let exhausted = refill(&mut buf)?;
+            buffers_filled += 1;
+            println!("buffers filled: {}", buffers_filled);
             if buf.is_empty() && exhausted {
                 break;
             }
