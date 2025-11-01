@@ -1,4 +1,5 @@
 import os
+import torch
 
 def get_base_dir():
     home_dir = os.path.expanduser("~")
@@ -11,3 +12,13 @@ def get_base_dir():
 def get_dist_info():
     # for now
     return False, 0, 0, 1
+
+def autodetect_device_type():
+    if torch.cuda.is_available():
+        device_type = "cuda"
+    elif torch.backends.mps.is_available():
+        device_type = "mps" # Metal Performance Shaders for apple silicon and amd (?)
+    else:
+        device_type = "cpu"
+    print(f"Autodetected device type: {device_type}")
+    return device_type
