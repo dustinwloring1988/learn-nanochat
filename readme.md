@@ -75,6 +75,9 @@ Leaving out nearly as much as possible from `base_train.py`, try to train a dept
 #### Challenge 14
 Train the baby model from challenge 13 on a single GPU. The point of this is to get an environment set up to work with a GPU and to make sure device is set/used properly in the code so far. I'll still need to add in validation, metrics, and checkpointing before scaling up.
 
+#### Challenge 15
+Sticking with GPU for a bit, understand how to calculate the GPU memory needed for the model.
+
 #### Future potential challenges, things to look up, questions, and todo 
 * Evaluate the tokenizer similar to `scripts/tok_eval.py`.
 
@@ -99,6 +102,8 @@ Train the baby model from challenge 13 on a single GPU. The point of this is to 
 * Understand how to compute possible model dimensions, batch size, sequence length, etc. based on GPU memory.
 
 * For training at least, what is the difference between say a batch size of 1 and a sequence length of 64 vs a batch size of 2 and a sequence length of 32? How do you choose?
+
+* Understand this: UserWarning: Quadro RTX 4000 does not support bfloat16 compilation natively, skipping (for example, if a GPU doesnt' support bfloat16 compilation, is it better not to use bfloat16 at all?)
 
 #### Completed
 
