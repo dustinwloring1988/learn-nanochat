@@ -105,6 +105,8 @@ Sticking with GPU for a bit, understand how to calculate the GPU memory needed f
 
 * Understand this: UserWarning: Quadro RTX 4000 does not support bfloat16 compilation natively, skipping (for example, if a GPU doesnt' support bfloat16 compilation, is it better not to use bfloat16 at all?)
 
+* Why in the dataloader do we use int32 for inputs but int64 for targets?
+
 #### Completed
 
 * After challenge 14, add autodetect_device_type() so the same notebooks will work on cpu and gpu going forward (ended up doing as part of challenge 14)
