@@ -4,11 +4,11 @@ import torch
 import sys
 sys.path.append('../my_nanochat')
 from my_nanochat.my_gpt import GPTConfig, GPT
-from my_nanochat.my_common import autodetect_device_type, memory_stats
+from my_nanochat.my_common import autodetect_device_type, log_memory_stats
 
 def create_model_and_do_one_training_step(depth,max_seq_len, device_batch_size):
 
-    print(f"Before: {memory_stats()}")
+    log_memory_stats("starting")
     
     device = autodetect_device_type()
 
@@ -34,24 +34,24 @@ def create_model_and_do_one_training_step(depth,max_seq_len, device_batch_size):
         model_config = GPTConfig(**model_config_kwargs)
         model = GPT(model_config)
     model.to_empty(device=device)
-    print(f"After creating model: {memory_stats()}")
+    log_memory_stats("after creating model")
     model.init_weights()
-    print(f"After initializing weights: {memory_stats()}")
+    log_memory_stats("after init_weights()")
     optimizers = model.setup_optimizers()
-    print(f"After setting up optimizers: {memory_stats()}")
+    log_memory_stats("after setup_optimizers()")
     x = torch.randint(0, vocab_size, (device_batch_size, max_seq_len), dtype=torch.int32, device=device)
     y = torch.randint(0, vocab_size, (device_batch_size, max_seq_len), dtype=torch.int64, device=device)
-    print(f"After creating x and y: {memory_stats()}")
+    log_memory_stats("after creating x and y()", {'x' : x, 'y' : y})
     with autocast_ctx:
         loss = model(x,y)
-        print(f"After forward: {memory_stats()}")
+        log_memory_stats("after forward")
     loss.backward()
-    print(f"After backward: {memory_stats()}")
+    log_memory_stats("after backward")
     for i, opt in enumerate(optimizers):
         opt.step()
-        print(f"After optimizer {i} step: {memory_stats()}")
+        log_memory_stats(f"After optimizer {i} step")
 
-    print(f"After: {memory_stats()}")
+    log_memory_stats("ending")
 
 
 if __name__ == "__main__":

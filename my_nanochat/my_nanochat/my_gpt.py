@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import math
 from functools import partial
-from my_nanochat.my_common import get_dist_info
+from my_nanochat.my_common import get_dist_info, log_memory_stats
 from my_nanochat.muon import Muon, DistMuon
 
 @dataclass
@@ -81,9 +81,13 @@ class MLP(nn.Module):
         self.c_proj = nn.Linear(4 * config.n_embd, config.n_embd, bias=False)
     
     def forward(self, x):
+        log_memory_stats("start of MLP forward", {'input x': x}, 1)
         x = self.c_fc(x)
+        log_memory_stats("after MLP c_fc", {'resulting x': x}, 1)
         x = F.relu(x).square()
+        log_memory_stats("after MLP F.relu(x).square()", {'resulting x': x}, 1)
         x = self.c_proj(x)
+        log_memory_stats("after MLP c_proj", {'resulting x': x}, 1)
         return x
 
 class Block(nn.Module):
@@ -193,6 +197,7 @@ class GPT(nn.Module):
 
 
     def forward(self, idx, targets=None, kv_cache=None, loss_reduction='mean'):
+        log_memory_stats("start of GPT forward", {'input idx': idx})
         assert kv_cache is None # for now
         
         B, T = idx.size()
@@ -205,29 +210,27 @@ class GPT(nn.Module):
         cos_sin = self.cos[:, T0:T0+T], self.sin[:, T0:T0+T]
 
         x = self.transformer.wte(idx)
+        log_memory_stats("after wte", {'resulting x': x})
         x = norm(x)
-        for block in self.transformer.h:
+        log_memory_stats("after initial norm", {'resulting x': x})
+        for i, block in enumerate(self.transformer.h):
             x = block(x, cos_sin, kv_cache)
+            log_memory_stats(f"after block {i}", {'resulting x': x})
         x = norm(x)
+        log_memory_stats("after final norm", {'resulting x': x})
 
         logits = self.lm_head(x)
+        log_memory_stats("after lm_head", {'logits': logits})
         softcap = 15
         logits = softcap * torch.tanh(logits / softcap)
+        log_memory_stats("after tanh(logits / softcap)", {'logits': logits})
         if targets is not None:
             logits = logits.float()
+            log_memory_stats("after logits.float()", {'logits': logits})
             loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), ignore_index=-1, reduction=loss_reduction)
+            log_memory_stats("after computing loss")
             return loss
         else:
             return logits
-
-
-
-
-
-
-
-
-
-
 
 

@@ -23,7 +23,16 @@ def autodetect_device_type():
     print(f"Autodetected device type: {device_type}")
     return device_type
 
-def memory_stats():
-    free, _ = torch.cuda.mem_get_info()
+memory_allocated_on_previous_log = 0
+
+def log_memory_stats(message, relevant_tensors = {}, indentation = 0):
+    if not os.environ.get("LOG_MEMORY_STATS"):
+        return
     allocated = torch.cuda.memory_allocated()
-    return f"Torch memory allocated: {allocated / 1024**3:.2f} GiB (free = {free / 1024**3:.2f} GiB)"
+    global memory_allocated_on_previous_log
+    delta = allocated - memory_allocated_on_previous_log
+    memory_allocated_on_previous_log = allocated
+    print(f"{' ' * indentation}{message} - now allocated: {allocated / 1024**3:.3f} GiB, delta: {delta / 1024**2:.3f} MiB")
+    for name, tensor in relevant_tensors.items():
+        print(f"{' ' * indentation} {name} - {list(tensor.shape)} - {tensor.dtype} - {tensor.untyped_storage().nbytes() / 1024**2:.3f} MiB")
+
