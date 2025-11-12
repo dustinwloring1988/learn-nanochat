@@ -48,7 +48,6 @@ class CausalSelfAttention(nn.Module):
         self.c_proj = nn.Linear(self.n_embd, self.n_embd, bias=False)
 
     def forward(self, x, cos_sin, kv_cache=None):
-        assert kv_cache is None # add support for this later
         B, T, C = x.size()
 
         q = self.c_q(x).view(B, T, self.n_head, self.head_dim)
@@ -63,13 +62,36 @@ class CausalSelfAttention(nn.Module):
 
         q, k, v = q.transpose(2,1), k.transpose(2,1), v.transpose(2,1) # (B,T,H,D) -> (B,H,T,D)
 
+        # apply KV cache: insert current k,v into cache and get the full view so far
+        if kv_cache is not None:
+            k, v = kv_cache.insert(self.layer_idx, k, v)
+        Tq = q.size(2) # number of queries in this forward pass (I think will usually be 1)
+        Tk = k.size(2) # number of keys/values in total (in the cache + in this forward pass)
+
         # code related to KV cache goes here
 
         # will understand and add code for GQA later
         assert self.n_head == self.n_kv_head
         enable_gqa = self.n_head != self.n_kv_head # always false for now
 
-        y = F.scaled_dot_product_attention(q, k, v, is_causal=True, enable_gqa=enable_gqa)
+        # read notes in challenge-20-understand-engine/add-kv-cache-support-to-gpt.ipynb
+        if kv_cache is None or Tq == Tk:
+            y = F.scaled_dot_product_attention(q, k, v, is_causal=True, enable_gqa=enable_gqa)
+        elif Tq == 1:
+            # believe this is the common case during inference after the initial prompt is processed
+            y = F.scaled_dot_product_attention(q, k, v, is_causal=False, enable_gqa=enable_gqa)
+        else:
+            attn_mask = torch.zeros((Tq,Tk), dtype=torch.bool, device=q.device) # True = keep
+            prefix_len = Tk - Tq # 2
+            if prefix_len > 0: # he says can't be negative but could be zero but don't think can be 0 due to above
+                attn_mask[:, :prefix_len] = True    # so whatever is in the prefix is allowed
+            attn_mask[:, prefix_len:] = torch.tril(torch.ones((Tq, Tq), dtype=torch.bool, device=q.device))
+            # A "square" of Trues on the left and a "triangle" of Trues on the right, like
+            # if Tk = 4 and Tq = 2 we'll end up with
+            # True True True False
+            # True True True True
+            y = F.scaled_dot_product_attention(q, k, v, attn_mask=attn_mask, enable_gqa=enable_gqa)
+
         y = y.transpose(1,2).contiguous().view(B, T, -1)
         y = self.c_proj(y)
         return y
@@ -193,7 +215,6 @@ class GPT(nn.Module):
 
 
     def forward(self, idx, targets=None, kv_cache=None, loss_reduction='mean'):
-        assert kv_cache is None # for now
         
         B, T = idx.size()
 
@@ -201,7 +222,8 @@ class GPT(nn.Module):
         assert idx.device == self.cos.device
         assert self.cos.dtype == torch.bfloat16
 
-        T0 = 0 # TODO T0 = 0 if kv_cache is None else kv_cache.get_pos()
+        # if kv cache exists, we need to offset the rotary embeddings to the current position in the cache
+        T0 = 0 if kv_cache is None else kv_cache.get_pos()
         cos_sin = self.cos[:, T0:T0+T], self.sin[:, T0:T0+T]
 
         x = self.transformer.wte(idx)
@@ -219,6 +241,34 @@ class GPT(nn.Module):
             return loss
         else:
             return logits
+
+    @torch.inference_mode() # like no_grad() but with more restrictions and speedup
+    def generate(self, tokens, max_tokens, temperature=1.0, top_k=None, seed=42):
+        assert isinstance(tokens, list)
+        device = self.get_device()
+        rng = None
+        if temperature > 0:
+            rng = torch.Generator(device=device)
+            rng.manual_seed(seed)
+        ids = torch.tensor([tokens], dtype=torch.long, device=device) # we just do bs=1
+        for _ in range(max_tokens):
+            logits = self.forward(ids) # [B, len(ids), vocab_size] ?
+            logits = logits[:, -1, :] # (B, vocab_size)
+            if top_k is not None:
+                v, _ = torch.topk(logits, min(top_k, logits.size(-1)))
+                logits[logits < v[:, [-1]]] = -float('Inf') # set all logits less than the smallest of the top k to -inf
+            if temperature > 0:
+                logits = logits / temperature
+                probs = F.softmax(logits, dim=-1)
+                next_ids = torch.multinomial(probs, num_samples=1, generator=rng)
+            else:
+                next_ids = torch.argmax(logits, dim=-1, keepdim=True)
+            ids = torch.cat((ids, next_ids), dim=1)
+            token = next_ids.item()
+            yield token
+
+
+
 
 
 
