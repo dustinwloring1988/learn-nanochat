@@ -13,10 +13,11 @@ from pathlib import Path
 import torch
 
 from my_nanochat.my_common import autodetect_device_type, compute_init, compute_cleanup, print0, get_base_dir
-from my_nanochat.my_tokenizer import get_tokenizer
+from my_nanochat.my_tokenizer import get_tokenizer, get_token_bytes
 from my_nanochat.my_gpt import GPTConfig, GPT
 from my_nanochat.my_dataloader import tokenizing_distributed_data_loader
 from my_nanochat.my_checkpoint_manager import save_checkpoint
+from my_nanochat.my_loss_eval import evaluate_bpb
 
 
 # TODO run / wandb
@@ -68,7 +69,7 @@ get_max_memory = torch.cuda.max_memory_allocated if device_type == "cuda" else l
 # TODO wandb logging init
 
 tokenizer = get_tokenizer()
-# TODO token_bytes = get_token_bytes(device=device)
+token_bytes = get_token_bytes(device=device)
 vocab_size = tokenizer.get_vocab_size()
 print0(f"Vocab size: {vocab_size:,}")
 
@@ -157,7 +158,7 @@ def get_muon_momentum(it):
     return momentum
 
 # training loop
-# TODO min_val_bpb = float("inf")
+min_val_bpb = float("inf")
 smooth_train_loss = 0 # EMA of training loss
 ema_beta = 0.9 # EMA decay factor
 total_training_time = 0 # wall-clock time
@@ -167,8 +168,17 @@ for step in range(num_iterations+1):
     # TODO flops_so_far = num_flops_per_token * total_batch_size * step
     
     if last_step or step % eval_every == 0:
-        # TODO once in a while evaluate the val bpb
-        print0("TODO evaluate bpb")
+        # once in a while evaluate the val bpb
+        model.eval()
+        val_loader = build_val_loader()
+        eval_steps = eval_tokens // (device_batch_size * max_seq_len * ddp_world_size)
+        with autocast_ctx:
+            val_bpb = evaluate_bpb(model, val_loader, eval_steps, token_bytes)
+        print0(f"step {step:05d} | Validation bpb: {val_bpb:.4f}")
+        if val_bpb < min_val_bpb:
+            min_val_bpb = val_bpb
+        # TODO wandb log
+        model.train()
 
     if core_metric_every > 0 and (last_step or (step > 0 and step % core_metric_every == 0)):
         # TODO once in a while esimate the CORE metric
@@ -248,7 +258,7 @@ for step in range(num_iterations+1):
 # print a few more stats
 print0(f"Peak memory usage: {get_max_memory() / 1024 / 1024:.2f}MiB")
 print0(f"Total training time: {total_training_time/60:.2f}m")
-# TODO print0(f"Minimum validation bpb: {min_val_bpb:.4f}")
+print0(f"Minimum validation bpb: {min_val_bpb:.4f}")
 
 # TODO log to report
 

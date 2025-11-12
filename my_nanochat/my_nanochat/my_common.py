@@ -2,7 +2,7 @@ import os
 import torch
 import torch.distributed as dist
 
-def print0():
+def print0(s, **kwargs):
     ddp_rank = int(os.environ.get('RANK', 0))
     if ddp_rank == 0:
         print(s, **kwargs)

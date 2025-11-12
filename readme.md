@@ -84,6 +84,9 @@ Do a tiny example of back propagation by hand. This is to build intuition for wh
 #### Challenge 17
 Create `scripts/my_base_train.py` by copying much of `base_train.py`. This should include the code from the baby training in previous challenges, code to pass config options on the command line, and code to save checkpoints. The idea is get organized before adding evaluations and scaling up training.
 
+#### Challenge 18
+Add calculating and displaying the BPB (bits per byte) evaluation to training.
+
 #### Future potential challenges, things to look up, questions, and todo 
 * Evaluate the tokenizer similar to `scripts/tok_eval.py`.
 
@@ -112,6 +115,8 @@ Create `scripts/my_base_train.py` by copying much of `base_train.py`. This shoul
 * Understand this: UserWarning: Quadro RTX 4000 does not support bfloat16 compilation natively, skipping (for example, if a GPU doesnt' support bfloat16 compilation, is it better not to use bfloat16 at all?)
 
 * Why in the dataloader do we use int32 for inputs but int64 for targets?
+
+* Better understand the concept behind BPB eval, nits, why it's a legit way to compare loss across diff vocab sizes, etc.
 
 #### Completed
 

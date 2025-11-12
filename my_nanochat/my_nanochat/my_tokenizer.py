@@ -70,5 +70,15 @@ class MyTokenizer:
     def get_vocab_size(self):
         return self.enc.n_vocab
 
+    def get_special_tokens(self):
+        return self.enc.special_tokens_set
+
 def get_tokenizer():
     return MyTokenizer.load_from_file(os.path.join(get_base_dir(), 'my-tokenizer.pkl'))
+
+def get_token_bytes(device="cpu"):
+    import torch
+    token_bytes_path = os.path.join(get_base_dir(), "token_bytes.pt")
+    assert os.path.exists(token_bytes_path), f"File {token_bytes_path} not found, create it from challenge-18-add-evaluate-bpb/add-evaluate-bpb.ipynb for now" # TODO
+    token_bytes = torch.load(token_bytes_path, map_location=device)
+    return token_bytes
