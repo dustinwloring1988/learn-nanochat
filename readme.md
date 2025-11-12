@@ -87,6 +87,9 @@ Create `scripts/my_base_train.py` by copying much of `base_train.py`. This shoul
 #### Challenge 18
 Add calculating and displaying the BPB (bits per byte) evaluation to training.
 
+#### Challenge 19
+Train for hours on the GPU. Now that `base_train.py` and BPB evaluation are in place, try running a longer training (e.g. in tmux) and confirm it completes.
+
 #### Future potential challenges, things to look up, questions, and todo 
 * Evaluate the tokenizer similar to `scripts/tok_eval.py`.
 
