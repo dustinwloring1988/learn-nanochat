@@ -18,7 +18,7 @@ from my_nanochat.my_gpt import GPTConfig, GPT
 from my_nanochat.my_dataloader import tokenizing_distributed_data_loader
 from my_nanochat.my_checkpoint_manager import save_checkpoint
 from my_nanochat.my_loss_eval import evaluate_bpb
-
+from my_nanochat.my_engine import Engine
 
 # TODO run / wandb
 
@@ -185,8 +185,24 @@ for step in range(num_iterations+1):
         print0("TODO evaluate CORE metric")
 
     if master_process and (last_step or (step > 0 and step % sample_every == 0)):
-        # TODO once in a while sample from the model
-        print0("TODO sample")
+        # once in a while sample from the model
+        model.eval()
+        prompts = [
+            "The capital of France is",
+            "The chemical symbol of gold is",
+            "If yesterday was Friday, then tomorrow will be",
+            "The opposite of hot is",
+            "The planets of the solar system are:",
+            "My favorite color is",
+            "If 5*x + 3 = 13, then x is",
+        ]
+        engine = Engine(orig_model, tokenizer)
+        for prompt in prompts:
+            tokens = tokenizer.encode(prompt, prepend=tokenizer.get_bos_token_id())
+            with autocast_ctx:
+                sample, _ = engine.generate_batch(tokens, num_samples=1, max_tokens=10, temperature=0)
+            print0(tokenizer.decode(sample[0]))
+        model.train()
 
     if master_process and last_step:
         # save checkpoint

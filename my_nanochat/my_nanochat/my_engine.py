@@ -1,4 +1,5 @@
 import torch
+import torch.nn.functional as F
 
 class KVCache:
 
@@ -61,3 +62,136 @@ class KVCache:
         if layer_idx == self.kv_cache.size(0) - 1:
             self.pos = t1
         return key_view, value_view
+
+
+class RowState:
+    # Per-row state tracking during generation -- is a row like one stream of tokens that is getting built up? We process
+    # rows through the model in in parallel, one column of tokens at a time?
+    def __init__(self, current_tokens=None):
+        self.current_tokens = current_tokens or [] # current token sequence for this row
+        # TODO 
+        self.completed = False # done generating this row, for example becuase hit <bos> ?
+
+@torch.inference_mode()
+def sample_next_token(logits, rng, temperature=1.0, top_k=None):
+    # logits shape: (B, vocab_size)
+    # return shape: (B, 1)
+    assert temperature >= 0
+    if temperature == 0:
+        return torch.argmax(logits, dim=-1, keepdim=True)
+    if top_k is not None:
+        k = min(top_k, logits.size(-1))
+        vals, idx = torch.topk(logits, k, dim=-1)
+        vals = vals / temperature
+        probs = F.softmax(vals, dim=-1)
+        choice = torch.multinomial(probs, num_samples=1, generator=rng)
+        return idx.gather(1, choice)
+    else:
+        logits = logits / temperature
+        probs = F.softmax(logits, dim=-1)
+        return torch.multinomial(probs, num_samples=1, generator=rng)
+
+class Engine:
+
+    def __init__(self, model, tokenizer=None):
+        self.model = model
+        self.tokenizer = tokenizer # TODO to get BOS token for now, later for other tokens for tool use
+
+    @torch.inference_mode()
+    def generate(self, tokens, num_samples=1, max_tokens=None, temperature=1.0, top_k=None, seed=42):
+        assert isinstance(tokens, list) and isinstance(tokens[0], int), 'expecting tokens to be a list of ints'
+        device = self.model.get_device()
+        rng = torch.Generator(device=device)
+        rng.manual_seed(seed)
+
+        # TODO: get the special tokens we need to coordinate the tool use state machine
+        bos = self.tokenizer.get_bos_token_id()
+
+        # 1) run a batch of size 1 with the prompt tokens to prefill the kv cache (?)
+        m = self.model.config
+        kv_model_kwargs = {
+            'num_heads': m.n_kv_head,
+            'head_dim': m.n_embd // m.n_head,
+            'num_layers': m.n_layer,
+        }
+        kv_cache_prefill = KVCache(batch_size=1, seq_len=len(tokens), **kv_model_kwargs)
+        ids = torch.tensor([tokens], dtype=torch.long, device=device)
+        logits = self.model.forward(ids, kv_cache=kv_cache_prefill)
+        logits = logits[:, -1, :]
+        next_ids = sample_next_token(logits, rng, temperature, top_k)  # (B, 1)
+        sampled_tokens = next_ids[:, 0].tolist()
+
+        # 2) replicate the KV cache for each sample/row
+        kv_length_hint = (len(tokens) + max_tokens) if max_tokens is not None else self.model.config.sequence_len
+        kv_cache_decode = KVCache(batch_size=num_samples, seq_len=kv_length_hint, **kv_model_kwargs)
+        kv_cache_decode.prefill(kv_cache_prefill)
+        del kv_cache_prefill
+
+        # 3) initalize row states for each sample
+        row_states = [RowState(tokens.copy()) for _ in range(num_samples)] # because all sampeles start with same prompt (tokens)
+
+        # 4) main generation loop
+        num_generated = 0
+        first_iteration = True
+        while True:
+
+            # stop conditions
+            if max_tokens is not None and num_generated >= max_tokens:
+                break
+            if all(state.completed for state in row_states):
+                break
+
+            if first_iteration:
+                sampled_tokens = [sampled_tokens[0]] * num_samples
+                # funny my first thought on ^ is then we're forcing all samples to have the same "next" first token after
+                # the prompt and he has a TODO for that
+                first_iteration = False
+            else:
+                logits = self.model.forward(ids, kv_cache=kv_cache_decode) # (B, T, vocab_size) # CHECK ids
+                assert ids.size(1) == 1 # TODO I ADDED THIS ASSERT because I'm curious when it could ever not be 1
+                logits = logits[:, -1, :]
+                next_ids = sample_next_token(logits, rng, temperature, top_k) # (B, 1)
+                sampled_tokens = next_ids[:, 0].tolist()
+
+            # Process each row
+            token_column = [] # contains next token id along each row
+            token_masks = [] # contains the mask 1 = it was sample, 0 = it was forced along each row
+            for i, state in enumerate(row_states):
+                # select the next token in this row
+                # TODO: logic around forcing tokens
+                next_token = sampled_tokens[i] # TODO this is until add logic around forcing tokens
+                token_column.append(next_token) 
+                token_masks.append(0) # TODO this is until add logic around forcing tokens
+
+                # update state of row to include next token
+                state.current_tokens.append(next_token)
+
+                # TODO also handle <assistant_end>
+                if next_token == bos:
+                    state.completed = True
+                
+                # TODO handle tool logic
+
+            yield token_column, token_masks
+            num_generated += 1
+
+            ids = torch.tensor(token_column, dtype=torch.long, device=device).unsqueeze(1)
+
+    def generate_batch(self, tokens, num_samples=1, **kwargs):
+        # TODO handle <|assistant_end|>
+        bos = self.tokenizer.get_bos_token_id()
+        results = [tokens.copy() for _ in range(num_samples)]
+        masks = [[0] * len(tokens) for _ in range(num_samples)]
+        completed = [False] * num_samples
+        for token_column, token_masks in self.generate(tokens, num_samples, **kwargs):
+            for i, (token, mask) in enumerate(zip(token_column, token_masks)):
+                if not completed[i]:
+                    if token == bos:
+                        completed[i] = True
+                    else:
+                        results[i].append(token)
+                        masks[i].append(mask)
+            if all(completed):
+                break
+        return results, masks
+
