@@ -119,6 +119,10 @@ def forward_model(model, input_ids):
     # return B x T tensor of losses and B x T tensor of argmax predictions
     # last column of losses is nan because we don't have a target to calculate loss
     batch_size, seq_len = input_ids.size()
+
+    # see challenge 21 notebook for the error this will get around on MPS
+    # torch.mps.empty_cache()
+
     outputs = model(input_ids)
     target_ids = torch.roll(input_ids, shifts=-1, dims=1)
 

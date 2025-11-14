@@ -181,8 +181,11 @@ for step in range(num_iterations+1):
         model.train()
 
     if core_metric_every > 0 and (last_step or (step > 0 and step % core_metric_every == 0)):
-        # TODO once in a while esimate the CORE metric
-        print0("TODO evaluate CORE metric")
+        model.eval()
+        with autocast_ctx:
+            results = evaluate_model(orig_model, tokenizer, device, max_per_task=core_metric_max_per_task)
+        print0(f"Step {step:05d}: CORE metric: {results['core_metric']:.4f}")
+        model.train()
 
     if master_process and (last_step or (step > 0 and step % sample_every == 0)):
         # once in a while sample from the model
