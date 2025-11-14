@@ -96,6 +96,14 @@ def download_file_with_lock(url, filename, postprocess_fn=None):
 
     return file_path
 
+class DummyWandb:
+    def __init__(self):
+        pass
+    def log(self, *args, **kwargs):
+        pass
+    def finish(self):
+        pass
+
 
 # for challenge-15-understand-memory-needed/understand-memory-needed.ipynb
 memory_allocated_on_previous_log = 0

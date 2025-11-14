@@ -56,3 +56,6 @@ ENV/
 *.parquet
 *.pkl
 *.pth
+
+# wandb
+wandb/

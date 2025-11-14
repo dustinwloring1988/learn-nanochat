@@ -12,7 +12,7 @@ from pathlib import Path
 
 import torch
 
-from my_nanochat.my_common import autodetect_device_type, compute_init, compute_cleanup, print0, get_base_dir
+from my_nanochat.my_common import autodetect_device_type, compute_init, compute_cleanup, print0, get_base_dir, DummyWandb
 from my_nanochat.my_tokenizer import get_tokenizer, get_token_bytes
 from my_nanochat.my_gpt import GPTConfig, GPT
 from my_nanochat.my_dataloader import tokenizing_distributed_data_loader
@@ -21,7 +21,9 @@ from my_nanochat.my_loss_eval import evaluate_bpb
 from my_nanochat.my_engine import Engine
 from scripts.my_base_eval import evaluate_model
 
-# TODO run / wandb
+import wandb
+
+run = "dummy" # wandb run name, "dummy" means don't log
 
 device_type = ""
 
@@ -68,6 +70,8 @@ synchronize = torch.cuda.synchronize if device_type == "cuda" else lambda: None 
 get_max_memory = torch.cuda.max_memory_allocated if device_type == "cuda" else lambda: 0
 
 # TODO wandb logging init
+use_dummy_wandb = run == "dummy" or not master_process
+wandb_run = DummyWandb() if use_dummy_wandb else wandb.init(project='my-nanochat', name=run, config=user_config)
 
 tokenizer = get_tokenizer()
 token_bytes = get_token_bytes(device=device)
@@ -178,7 +182,12 @@ for step in range(num_iterations+1):
         print0(f"step {step:05d} | Validation bpb: {val_bpb:.4f}")
         if val_bpb < min_val_bpb:
             min_val_bpb = val_bpb
-        # TODO wandb log
+        wandb_run.log({
+            'step': step,
+            'total_training_time': total_training_time,
+            'val/bpb': val_bpb,
+        })
+        # TODO log flops once have
         model.train()
 
     if core_metric_every > 0 and (last_step or (step > 0 and step % core_metric_every == 0)):
@@ -186,6 +195,12 @@ for step in range(num_iterations+1):
         with autocast_ctx:
             results = evaluate_model(orig_model, tokenizer, device, max_per_task=core_metric_max_per_task)
         print0(f"Step {step:05d}: CORE metric: {results['core_metric']:.4f}")
+        wandb_run.log({
+            'step': step,
+            'core_metric': results['core_metric'],
+            'centered_results': results['centered_results'],
+        })
+        # TODO log flops once have
         model.train()
 
     if master_process and (last_step or (step > 0 and step % sample_every == 0)):
@@ -273,7 +288,19 @@ for step in range(num_iterations+1):
         total_training_time += dt
     print_grad_norm = f" grad norm: {grad_norm:.4f} |" if grad_clip_enabled else ""
     print0(f"step {step:05d}/{num_iterations:05d} ({pct_done:.2f}%) | loss: {debiased_smooth_loss:.6f} |{print_grad_norm} lrm: {lrm:.2f} | dt: {dt * 1000:.2f}ms | tok/sec: {tok_per_sec:,} | mfu: {mfu:.2f} | total time: {total_training_time/60:.2f}m")
-    # TODO log to wandb
+    if step % 100 == 0:
+        log_data = {
+            'step': step,
+            'total_training_time': total_training_time,
+            'train/loss': debiased_smooth_loss,
+            'train/lrm': lrm,
+            'train/dt': dt,
+            'train/tok_per_sec': tok_per_sec,
+        }
+        # TODO add total_training_flops and mfu once have
+        if grad_clip_enabled:
+            log_data['train/grad_norm'] = grad_norm
+        wandb_run.log(log_data)
 
 # print a few more stats
 print0(f"Peak memory usage: {get_max_memory() / 1024 / 1024:.2f}MiB")
@@ -283,7 +310,7 @@ print0(f"Minimum validation bpb: {min_val_bpb:.4f}")
 # TODO log to report
 
 # cleanup
-# TODO wandb run finish
+wandb_run.finish()
 compute_cleanup()
 
 

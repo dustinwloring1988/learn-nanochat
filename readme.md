@@ -96,6 +96,9 @@ Understand and add `engine.py`. So far, for example at the end of the challenge 
 #### Challenge 21
 Understand CORE metric evaluation. Possibly implement now or possibly hold off. (Decided to implement.)
 
+#### Challenge 22
+Add wandb logging. This should be straightforward and maybe it will be helpful before scaling up training.
+
 #### Future potential challenges, things to look up, questions, and todo 
 * Evaluate the tokenizer similar to `scripts/tok_eval.py`.
 
