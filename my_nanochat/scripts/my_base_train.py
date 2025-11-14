@@ -19,6 +19,7 @@ from my_nanochat.my_dataloader import tokenizing_distributed_data_loader
 from my_nanochat.my_checkpoint_manager import save_checkpoint
 from my_nanochat.my_loss_eval import evaluate_bpb
 from my_nanochat.my_engine import Engine
+from scripts.my_base_eval import evaluate_model
 
 # TODO run / wandb
 

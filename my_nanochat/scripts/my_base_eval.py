@@ -9,7 +9,7 @@ import json
 import random
 import torch
 
-from my_nanochat.my_common import get_base_dir, print0, log_memory_stats
+from my_nanochat.my_common import get_base_dir, print0, log_memory_stats, download_file_with_lock
 from my_nanochat.my_core_eval import evaluate_task
 
 # ~162MB of data needed to evaluate the CORE metric
@@ -89,7 +89,7 @@ def evaluate_model(model, tokenizer, device, max_per_task=-1, tasks_to_run=None)
     core_metric = sum(centered_results.values()) / len(centered_results)
     out = {
         'results': results,
-        'centered_result': centered_result,
+        'centered_result': centered_results,
         'core_metric': core_metric
     }
     return out
