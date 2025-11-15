@@ -134,6 +134,8 @@ Train on multiple GPUs. Before trying out more powerful GPUs, I want to get the 
 
 * Better understand the concept behind BPB eval, nits, why it's a legit way to compare loss across diff vocab sizes, etc.
 
+* Make sure I understand how weight initialization works for distributed training and if it's ok for weights on diffrent GPUs to start out different
+
 #### Completed
 
 * After challenge 14, add autodetect_device_type() so the same notebooks will work on cpu and gpu going forward (ended up doing as part of challenge 14)
