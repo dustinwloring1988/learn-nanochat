@@ -71,7 +71,7 @@ autocast_ctx = torch.amp.autocast(device_type=device_type, dtype=torch.bfloat16)
 synchronize = torch.cuda.synchronize if device_type == "cuda" else lambda: None  # wait for GPU to finish operations
 get_max_memory = torch.cuda.max_memory_allocated if device_type == "cuda" else lambda: 0
 
-# TODO wandb logging init
+# wandb logging init
 use_dummy_wandb = run == "dummy" or not master_process
 wandb_run = DummyWandb() if use_dummy_wandb else wandb.init(project='my-nanochat', name=run, config=user_config)
 
@@ -241,7 +241,7 @@ for step in range(num_iterations+1):
             [opt.state_dict() for opt in optimizers],
             {
                 "step": step,
-                "val_bpb": -1, # TODO
+                "val_bpb": val_bpb,
                 "model_config": model_config_kwargs,
                 "user_config": user_config,
                 "device_batch_size": device_batch_size,
