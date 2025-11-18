@@ -148,6 +148,10 @@ Understand what "mid train" is and look at some of the training data.
 
 * If warnings at start of train persist on more modern GPUs investigate
 
+* Understand why we don't do grad clipping in midtraining, or why we need to do it in base training
+
+* Understand why we don't evalute CORE metrics or sample every so often during mid training
+
 #### Completed
 
 * After challenge 14, add autodetect_device_type() so the same notebooks will work on cpu and gpu going forward (ended up doing as part of challenge 14)

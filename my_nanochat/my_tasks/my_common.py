@@ -1,5 +1,7 @@
 # copied from https://github.com/karpathy/nanochat/blob/master/tasks/common.py
 
+import random
+
 class MyTask:
 
     def __init__(self, start=0, stop=None, step=1):
@@ -46,3 +48,26 @@ def render_mc(question, letters, choices):
     query += "".join([f"- {choice}={letter}\n" for letter, choice in zip(letters, choices)])
     query += "\nRespond only with the letter of the correct answer."
     return query
+
+
+class MyTaskMixture(MyTask):
+
+    def __init__(self, tasks, **kwargs):
+        super().__init__(**kwargs)
+        self.tasks = tasks
+        self.lengths = [len(task) for task in self.tasks]
+        self.num_conversations = sum(self.lengths)
+        self.index_map = []
+        for task_idx, task_length in enumerate(self.lengths):
+            for local_idx in range(task_length):
+                self.index_map.append((task_idx, local_idx))
+        rng = random.Random(42)
+        rng.shuffle(self.index_map)
+
+    def num_examples(self):
+        return self.num_conversations
+
+    def get_example(self, index):
+        assert 0 <= index <= self.num_conversations
+        task_idx, local_idx = self.index_map[index]
+        return self.tasks[task_idx][local_idx]

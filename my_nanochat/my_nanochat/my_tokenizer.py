@@ -4,6 +4,7 @@ import pickle;
 from functools import lru_cache;
 from my_nanochat.my_common import get_base_dir
 import os
+import copy
 
 # copied from https://github.com/karpathy/nanochat/blob/master/nanochat/tokenizer.py
 SPLIT_PATTERN = r"""'(?i:[sdmt]|ll|ve|re)|[^\r\n\p{L}\p{N}]?+\p{L}+|\p{N}{1,2}| ?[^\s\p{L}\p{N}]++[\r\n]*|\s*[\r\n]|\s+(?!\S)|\s+"""
@@ -87,6 +88,74 @@ class MyTokenizer:
 
     def get_special_tokens(self):
         return self.enc.special_tokens_set
+
+    def render_conversation(self, conversation, max_tokens=2048):
+        ids, mask = [], []
+        def add_tokens(token_ids, mask_val):
+            if isinstance(token_ids, int):
+                token_ids = [token_ids]
+            ids.extend(token_ids)
+            mask.extend([mask_val] * len(token_ids))
+
+        if conversation['messages'][0]['role'] == 'system':
+            conversation = copy.deepcopy(conversation)
+            messages = conversation['messages']
+            assert messages[1]['role'] == 'user'
+            messages[1]['content'] = messages[0]['content'] + "\n\n" + messages[1]['content']
+            messages = messages[1:]
+        else:
+            messages = conversation['messages']
+        assert len(messages) >= 1
+
+        bos = self.get_bos_token_id()
+        user_start, user_end = self.encode_special("<|user_start|>"), self.encode_special("<|user_end|>")
+        assistant_start, assistant_end = self.encode_special("<|assistant_start|>"), self.encode_special("<|assistant_end|>")
+        python_start, python_end = self.encode_special("<|python_start|>"), self.encode_special("<|python_end|>")
+        output_start, output_end = self.encode_special("<|output_start|>"), self.encode_special("<|output_end|>")
+
+        add_tokens(bos, 0)
+        for i, message in enumerate(messages):
+            
+            must_be_from = 'user' if i % 2 == 0 else 'assistant'
+            assert message['role'] == must_be_from
+
+            content = message['content']
+
+            if message['role'] == 'user':
+                assert isinstance(content, str)
+                value_ids = self.encode(content)
+                add_tokens(user_start, 0)
+                add_tokens(value_ids, 0)
+                add_tokens(user_end, 0)
+            elif message['role'] == 'assistant':
+                add_tokens(assistant_start, 0)
+                if isinstance(content, str):
+                    value_ids = self.encode(content)
+                    add_tokens(value_ids, 1)
+                elif isinstance(content, list):
+                    for part in content:
+                        value_ids = self.encode(part['text'])
+                        if part['type'] == 'text':
+                            add_tokens(value_ids, 1)
+                        elif part['type'] == 'python':
+                            add_tokens(python_start, 1)
+                            add_tokens(value_ids, 1)
+                            add_tokens(python_end, 1)
+                        elif part['type'] == 'python_output':
+                            add_tokens(output_start, 0)
+                            add_tokens(value_ids, 0)
+                            add_tokens(output_end, 0)
+                        else:
+                            assert False
+                else:
+                    assert False
+                add_tokens(assistant_end, 1)
+            else:
+                assert False
+
+        ids = ids[:max_tokens]
+        mask = mask[:max_tokens]
+        return ids, mask
 
 def get_tokenizer():
     return MyTokenizer.load_from_file(os.path.join(get_base_dir(), 'my-tokenizer.pkl'))
