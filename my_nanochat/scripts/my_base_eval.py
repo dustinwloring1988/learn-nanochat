@@ -8,9 +8,14 @@ import time
 import json
 import random
 import torch
+import argparse
+from contextlib import nullcontext
 
-from my_nanochat.my_common import get_base_dir, print0, log_memory_stats, download_file_with_lock
+from my_nanochat.my_common import get_base_dir, print0, log_memory_stats, download_file_with_lock, get_dist_info, autodetect_device_type, compute_init, compute_cleanup
 from my_nanochat.my_core_eval import evaluate_task
+from my_nanochat.my_engine import Engine
+from my_nanochat.my_checkpoint_manager import load_model
+
 
 # ~162MB of data needed to evaluate the CORE metric
 EVAL_BUNDLE_URL = "https://karpathy-public.s3.us-west-2.amazonaws.com/eval_bundle.zip"
@@ -93,3 +98,35 @@ def evaluate_model(model, tokenizer, device, max_per_task=-1, tasks_to_run=None)
         'core_metric': core_metric
     }
     return out
+
+def main():
+    parser = argparse.ArgumentParser()
+    # TODO support HF model eval
+    parser.add_argument('--max-per-task', type=int, default=-1)
+    parser.add_argument('-i', '--source', type=str, default='base', help="Source of the model: base|sft|mid|rl")
+    parser.add_argument('-g', '--model-tag', type=str, default=None, help='Model tag to load')
+    parser.add_argument('--tasks-to-run', type=str, default=None, help="Tasks to run. Default = all tasks. Use | to split multiple tasks.")
+
+    args = parser.parse_args()
+
+    device_type = autodetect_device_type()
+    ddp, ddp_rank, ddp_local_rank, ddp_world_size, device = compute_init(device_type)
+    autocast_ctx = torch.amp.autocast(device_type=device_type, dtype=torch.bfloat16) if device_type == "cuda" else nullcontext()
+
+    model, tokenizer, meta = load_model(args.source, device, phase='eval', model_tag=args.model_tag)
+    engine = Engine(model, tokenizer)
+
+    tasks_to_run = None if args.tasks_to_run is None else args.tasks_to_run.split('|')
+
+    with autocast_ctx:
+        results = evaluate_model(model, tokenizer, device, max_per_task=args.max_per_task, tasks_to_run=tasks_to_run)
+
+    print0(f"CORE metric: {results['core_metric']:.4f}")
+    print0(f"centered results:\n{json.dumps(results['centered_results'], indent=4)}")
+
+    # TODO write out CSV file, print out table, log to report
+
+    compute_cleanup()
+
+if __name__ == "__main__":
+    main()
