@@ -5,6 +5,7 @@ from contextlib import nullcontext
 import time
 import torch
 import torch.distributed as dist
+import wandb
 
 
 from my_nanochat.my_common import get_base_dir, autodetect_device_type, compute_init, print0, DummyWandb, compute_cleanup
