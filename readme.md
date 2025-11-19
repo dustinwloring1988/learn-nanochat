@@ -114,6 +114,9 @@ Understand what "mid train" is and look at some of the training data.
 #### Challenge 27
 Understand chat eval.
 
+#### Challenge 28
+Midtrain the d20 model.
+
 #### Future potential challenges, things to look up, questions, and todo 
 * Evaluate the tokenizer similar to `scripts/tok_eval.py`.
 
