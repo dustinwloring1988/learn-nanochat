@@ -111,6 +111,9 @@ Do a complete pretrain of the d20 model using the same specs as in his `speedrun
 #### Challenge 26
 Understand what "mid train" is and look at some of the training data.
 
+#### Challenge 27
+Understand chat eval.
+
 #### Future potential challenges, things to look up, questions, and todo 
 * Evaluate the tokenizer similar to `scripts/tok_eval.py`.
 
@@ -151,6 +154,8 @@ Understand what "mid train" is and look at some of the training data.
 * Understand why we don't do grad clipping in midtraining, or why we need to do it in base training
 
 * Understand why we don't evalute CORE metrics or sample every so often during mid training
+
+* Re-implement or at least look closely at execution.py and humaneval.py
 
 #### Completed
 

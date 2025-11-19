@@ -157,6 +157,18 @@ class MyTokenizer:
         mask = mask[:max_tokens]
         return ids, mask
 
+    def render_for_completion(self, conversation):
+        conversation = copy.deepcopy(conversation)
+        messages = conversation['messages']
+        assert messages[-1]['role'] == 'assistant'
+        messages.pop()
+
+        ids, _ = self.render_conversation(conversation)
+
+        assistant_start = self.encode_special('<|assistant_start|>')
+        ids.append(assistant_start)
+        return ids
+
 def get_tokenizer():
     return MyTokenizer.load_from_file(os.path.join(get_base_dir(), 'my-tokenizer.pkl'))
 
