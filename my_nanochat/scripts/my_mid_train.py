@@ -55,7 +55,7 @@ get_max_memory = torch.cuda.max_memory_allocated if device_type == "cuda" else l
 
 # wandb logging init
 use_dummy_wandb = run == "dummy" or not master_process
-wandb_run = DummyWandb() if use_dummy_wandb else wandb.init(project='my-nanochat', name=run, config=user_config)
+wandb_run = DummyWandb() if use_dummy_wandb else wandb.init(project='my-nanochat-mid', name=run, config=user_config)
 
 # load model and tokenizer
 model, tokenizer, meta_data = load_model('base', device, phase='train', model_tag=model_tag, step=step)
@@ -235,6 +235,8 @@ while True:
         for group in opt.param_groups:
             group['lr'] = group['initial_lr'] * lrm
     muon_momentum = get_muon_momentum(step)
+    for group in muon_optimizer.param_groups:
+        group["momentum"] = muon_momentum
     for opt in optimizers:
         opt.step()
 
